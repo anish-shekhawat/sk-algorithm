@@ -73,9 +73,15 @@ class SVM(object):
         pos_input_sum = np.zeros(625)
         neg_input_sum = np.zeros(625)
 
-        # Convert images to numpy array of pixels
+        # TODO: Remove this
+        files = []
         for filename in os.listdir(train_folder):
+            files.append(filename)
 
+        files.sort()
+
+        # Convert images to numpy array of pixels
+        for filename in files:
             # Get absolute path
             abs_path = os.path.abspath(train_folder) + "/" + filename
             # TODO: Remove duplicate code
@@ -131,6 +137,9 @@ class SVM(object):
     def train(self, output_file):
         self.__scale_convex_hull()
 
+        # sk_a, sk_b, sk_c, sk_d = self.__sk_initialize()
+        self.__sk_initialize()
+
     def __scale_convex_hull(self):
         """Scale convex hull of inputs
 
@@ -160,19 +169,53 @@ class SVM(object):
         self.neg_input *= self.lambda_max
         self.neg_input += ((1 - self.lambda_max) * self.neg_centroid)
 
-        print self.pos_input[0]
-        print self.neg_input[0]
+        # print self.pos_input[0]
+        # print self.neg_input[0]
 
-    def polynomial_kernal(self, vector_a, vecotr_b):
+    def __sk_initialize(self):
+
+        pos_alpha = np.zeros(self.pos_input.shape[0])
+        neg_alpha = np.zeros(self.neg_input.shape[1])
+
+        pos_alpha[0] = 1
+        neg_alpha[0] = 1
+
+        param_a = self.__polynomial_kernal(
+            self.pos_input[0], self.pos_input[0])
+
+        param_b = self.__polynomial_kernal(
+            self.neg_input[0], self.neg_input[0])
+
+        param_c = self.__polynomial_kernal(
+            self.pos_input[0], self.neg_input[0])
+
+        param_pos_d = [self.__polynomial_kernal(
+            p, self.pos_input[0]) for p in self.pos_input]
+
+        param_neg_d = [self.__polynomial_kernal(
+            p, self.pos_input[0]) for p in self.neg_input]
+
+        param_pos_e = [self.__polynomial_kernal(
+            p, self.neg_input[0]) for p in self.pos_input]
+
+        param_neg_e = [self.__polynomial_kernal(
+            p, self.neg_input[0]) for p in self.neg_input]
+
+        return (param_a, param_b, param_c, param_pos_d, param_neg_d,
+                param_pos_e, param_neg_e)
+
+    def __polynomial_kernal(self, vector_a, vector_b):
         """Return result of degree four polynomial kernel function
 
         :param a:
         :param b:
         :returns:
         """
-        degree = 4 * self.epsilon
 
-        return degree
+        result = np.dot(vector_a, vector_b) + 1
+        result = result ** 4
+
+        return result
 
 
 if __name__ == '__main__':
