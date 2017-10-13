@@ -35,7 +35,7 @@ class SVM(object):
         self.epsilon = epsilon
         self.max_updates = max_updates
         self.class_letter = class_letter
-        self.zener_card_letters = set(['O', 'P', 'Q', 'S', 'W'])
+        self.lambda_max = 0.0
         # TODO: Convert to list
         self.pos_input = np.zeros(625)
         self.neg_input = np.zeros(625)
@@ -60,8 +60,10 @@ class SVM(object):
 
         class_letter_set = set(list(self.class_letter))
 
+        zener_card_letters = set(['O', 'P', 'Q', 'S', 'W'])
+
         # Get class letters of negative inputs
-        neg_class_letter_set = self.zener_card_letters - class_letter_set
+        neg_class_letter_set = zener_card_letters - class_letter_set
 
         neg_class_letters = "".join(list(neg_class_letter_set))
 
@@ -86,6 +88,7 @@ class SVM(object):
                 img_array = np.array(image)
                 # Reshape array to one dimension
                 img_array = img_array.reshape(-1)
+                # img_array /= 255
                 # Add to tpos_input_sum to calculate the centroid
                 pos_input_sum = np.add(pos_input_sum, img_array)
                 # Append to positive input collection array
@@ -100,7 +103,7 @@ class SVM(object):
                 img_array = np.array(image)
                 # Reshape array to one dimension
                 img_array = img_array.reshape(-1)
-                img_array /= 255
+                # img_array /= 255
                 # Add to neg_input_sum to calculate the centroid
                 neg_input_sum = np.add(neg_input_sum, img_array)
                 # Append to positive input collection array
@@ -124,6 +127,41 @@ class SVM(object):
         """
         self.pos_centroid = pos_sum / self.pos_input.shape[0]
         self.neg_centroid = neg_sum / self.neg_input.shape[0]
+
+    def train(self, output_file):
+        self.__scale_convex_hull()
+
+    def __scale_convex_hull(self):
+        """Scale convex hull of inputs
+
+        Calculate maximum value of scaling factor (lambda) and
+        scales the inputs using the lambda value
+        """
+
+        radius = np.linalg.norm(self.pos_centroid - self.neg_centroid)
+
+        pos_radius = max([np.linalg.norm(p - self.pos_centroid)
+                          for p in self.pos_input])
+
+        neg_radius = max([np.linalg.norm(p - self.neg_centroid)
+                          for p in self.neg_input])
+
+        self.lambda_max = radius / (pos_radius + neg_radius)
+
+        self.__scale_inputs()
+
+    def __scale_inputs(self):
+        """Scale inputs"""
+        # print self.pos_input[0]
+        # print self.pos_centroid
+        self.pos_input *= self.lambda_max
+        self.pos_input += ((1 - self.lambda_max) * self.pos_centroid)
+
+        self.neg_input *= self.lambda_max
+        self.neg_input += ((1 - self.lambda_max) * self.neg_centroid)
+
+        print self.pos_input[0]
+        print self.neg_input[0]
 
     def polynomial_kernal(self, vector_a, vecotr_b):
         """Return result of degree four polynomial kernel function
@@ -149,3 +187,4 @@ if __name__ == '__main__':
     svm = SVM(sys.argv[1], sys.argv[2], sys.argv[3])
 
     svm.set_training_inputs(sys.argv[5])
+    svm.train(sys.argv[4])
