@@ -15,6 +15,11 @@ class SVM(object):
         epsilon:
         max_updates
         class_letter
+        zener_card_letters
+        pos_input
+        neg_input
+        pos_centroid
+        neg_centroid
 
     """
 
@@ -31,14 +36,17 @@ class SVM(object):
         self.max_updates = max_updates
         self.class_letter = class_letter
         self.zener_card_letters = set(['O', 'P', 'Q', 'S', 'W'])
+        # TODO: Convert to list
         self.pos_input = np.zeros(625)
         self.neg_input = np.zeros(625)
+        self.pos_centroid = np.zeros(625)
+        self.neg_centroid = np.zeros(625)
 
-    def get_training_inputs(self, train_folder):
-        """Get training images and convert them to numpy array.
+    def set_training_inputs(self, train_folder):
+        """Sets positive and negative training data arrays.
 
         :param train_folder: Folder name where training inputs are stored
-        "returns: Numpy array of arrays of training images' pixel values
+        "returns: returns nothing
         """
         # Check if folder exists
         if os.path.isdir(train_folder) is not True:
@@ -61,14 +69,14 @@ class SVM(object):
         neg_pattern = re.compile("[0-9]+_[" + neg_class_letters + "].png")
 
         pos_input_sum = np.zeros(625)
-        neg_input_temp = np.zeros(625)
+        neg_input_sum = np.zeros(625)
 
         # Convert images to numpy array of pixels
         for filename in os.listdir(train_folder):
 
             # Get absolute path
             abs_path = os.path.abspath(train_folder) + "/" + filename
-
+            # TODO: Remove duplicate code
             # Check if filename matches training class pattern
             if pos_pattern.match(filename):
                 is_empty = False
@@ -92,22 +100,30 @@ class SVM(object):
                 img_array = np.array(image)
                 # Reshape array to one dimension
                 img_array = img_array.reshape(-1)
-                # Add to neg_input_temp to calculate the centroid
-                neg_input_temp = np.add(neg_input_temp, img_array)
+                img_array /= 255
+                # Add to neg_input_sum to calculate the centroid
+                neg_input_sum = np.add(neg_input_sum, img_array)
                 # Append to positive input collection array
                 self.neg_input = np.vstack((self.neg_input, img_array))
-
-        self.pos_input = np.delete(self.pos_input, 0, 0)
-        self.neg_input = np.delete(self.neg_input, 0, 0)
-
-        print self.pos_input.shape
-        print self.neg_input.shape
 
         if is_empty is True:
             print >> sys.stderr, "NO DATA"
             exit(1)
 
-        # print img_array
+        self.pos_input = np.delete(self.pos_input, 0, 0)
+        self.neg_input = np.delete(self.neg_input, 0, 0)
+
+        self.__set_input_class_centroids(pos_input_sum, neg_input_sum)
+
+    def __set_input_class_centroids(self, pos_sum, neg_sum):
+        """Sets positive and negative training input centroids
+
+        :param pos_sum: Array sum of positive inputs
+        :param neg_sum: Array sum of negative inputs
+        :return: returns nothing
+        """
+        self.pos_centroid = pos_sum / self.pos_input.shape[0]
+        self.neg_centroid = neg_sum / self.neg_input.shape[0]
 
     def polynomial_kernal(self, vector_a, vecotr_b):
         """Return result of degree four polynomial kernel function
@@ -132,4 +148,4 @@ if __name__ == '__main__':
 
     svm = SVM(sys.argv[1], sys.argv[2], sys.argv[3])
 
-    svm.get_training_inputs(sys.argv[5])
+    svm.set_training_inputs(sys.argv[5])
