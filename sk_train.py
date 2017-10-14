@@ -167,6 +167,8 @@ class SVM(object):
         output['lambda'] = self.lambda_max
         output['pos_alpha'] = init_params['pos_alpha']
         output['neg_alpha'] = init_params['neg_alpha']
+        output['A'] = init_params['sk_a']
+        output['B'] = init_params['sk_b']
 
         pickle.dump(output, out_file)
 
