@@ -137,8 +137,16 @@ class SVM(object):
     def train(self, output_file):
         self.__scale_convex_hull()
 
-        # sk_a, sk_b, sk_c, sk_d = self.__sk_initialize()
-        self.__sk_initialize()
+        init_params = dict.fromkeys(['sk_a', 'sk_b', 'sk_c', 'sk_pos_d',
+                                     'sk_neg_d', 'sk_pos_e', 'sk_neg_e'])
+
+        self.__sk_initialize(init_params)
+
+        print self.__sk_stop(init_params)
+
+        print init_params['sk_a'], init_params['sk_b'], init_params['sk_c']
+
+        self.__sk_update(init_params)
 
     def __scale_convex_hull(self):
         """Scale convex hull of inputs
@@ -172,7 +180,11 @@ class SVM(object):
         # print self.pos_input[0]
         # print self.neg_input[0]
 
-    def __sk_initialize(self):
+    def __sk_initialize(self, params):
+        """Initialize parameters for S-K algorithms
+
+        :param params:
+        """
 
         pos_alpha = np.zeros(self.pos_input.shape[0])
         neg_alpha = np.zeros(self.neg_input.shape[1])
@@ -180,29 +192,26 @@ class SVM(object):
         pos_alpha[0] = 1
         neg_alpha[0] = 1
 
-        param_a = self.__polynomial_kernal(
+        params['sk_a'] = self.__polynomial_kernal(
             self.pos_input[0], self.pos_input[0])
 
-        param_b = self.__polynomial_kernal(
+        params['sk_b'] = self.__polynomial_kernal(
             self.neg_input[0], self.neg_input[0])
 
-        param_c = self.__polynomial_kernal(
+        params['sk_c'] = self.__polynomial_kernal(
             self.pos_input[0], self.neg_input[0])
 
-        param_pos_d = [self.__polynomial_kernal(
+        params['sk_pos_d'] = [self.__polynomial_kernal(
             p, self.pos_input[0]) for p in self.pos_input]
 
-        param_neg_d = [self.__polynomial_kernal(
+        params['sk_neg_d'] = [self.__polynomial_kernal(
             p, self.pos_input[0]) for p in self.neg_input]
 
-        param_pos_e = [self.__polynomial_kernal(
+        params['sk_pos_e'] = [self.__polynomial_kernal(
             p, self.neg_input[0]) for p in self.pos_input]
 
-        param_neg_e = [self.__polynomial_kernal(
+        params['sk_neg_e'] = [self.__polynomial_kernal(
             p, self.neg_input[0]) for p in self.neg_input]
-
-        return (param_a, param_b, param_c, param_pos_d, param_neg_d,
-                param_pos_e, param_neg_e)
 
     def __polynomial_kernal(self, vector_a, vector_b):
         """Return result of degree four polynomial kernel function
@@ -216,6 +225,61 @@ class SVM(object):
         result = result ** 4
 
         return result
+
+    def __sk_stop(self, init_param):
+        """Check if the stopping condition is true
+
+        :param init_param:
+        """
+
+        pos_m_array = [self.__calculate_m(init_param, i, 1)
+                       for i, p in enumerate(self.pos_input)]
+
+        neg_m_array = [self.__calculate_m(init_param, i, -1)
+                       for i, p in enumerate(self.neg_input)]
+
+        pos_min, pindex = min((val, idx) for idx, val in enumerate(pos_m_array))
+        neg_min, nindex = min((val, idx) for idx, val in enumerate(neg_m_array))
+
+        point_t = {}
+
+        if pos_min > neg_min:
+            point_t['class'] = 'pos'
+            point_t['index'] = pindex
+            min_m = pos_min
+        else:
+            point_t['class'] = 'neg'
+            point_t['index'] = nindex
+            min_m = neg_min
+
+        sum_sqrt = init_param['sk_a'] + \
+            init_param['sk_b'] - 2 * init_param['sk_c']
+        sum_sqrt **= 0.5
+
+        return (point_t, sum_sqrt - min_m < self.epsilon)
+
+    @staticmethod
+    def __calculate_m(params, index, input_class):
+        """Calculate m
+
+        :param params:
+        :param point:
+        :input_class:
+        """
+
+        if input_class < 0:
+            numerator = params['sk_neg_e'][index] - params['sk_neg_d'][index]
+            numerator += params['sk_a'] - params['sk_c']
+        else:
+            numerator = params['sk_pos_d'][index] - params['sk_pos_e'][index]
+            numerator += params['sk_b'] - params['sk_c']
+
+        denominator = params['sk_a'] + params['sk_b'] - 2 * params['sk_c']
+        denominator **= 0.5
+
+        return numerator / denominator
+
+    def __sk_update(self, init_params, ):
 
 
 if __name__ == '__main__':
