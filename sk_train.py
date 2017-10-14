@@ -14,12 +14,11 @@ class SVM(object):
 
     Attirbutes:
         epsilon:
-        max_updates
-        class_letter
-        zener_card_letters
-        pos_input
-        neg_input
-        pos_centroid
+        max_updates: Max no. of updates
+        class_letter: Class letter of training model
+        pos_input: Positive training samples
+        neg_input: Negative training samples
+        pos_centroid: Centroid of positive training samples
         neg_centroid
 
     """
@@ -37,7 +36,6 @@ class SVM(object):
         self.max_updates = int(max_updates)
         self.class_letter = class_letter
         self.lambda_max = 0.0
-        # TODO: Convert to list
         self.pos_input = np.zeros(625)
         self.neg_input = np.zeros(625)
         self.pos_centroid = np.zeros(625)
@@ -74,7 +72,6 @@ class SVM(object):
         pos_input_sum = np.zeros(625)
         neg_input_sum = np.zeros(625)
 
-        # TODO: Remove this
         files = []
         for filename in os.listdir(train_folder):
             files.append(filename)
@@ -144,7 +141,6 @@ class SVM(object):
                                      'sk_pos_e', 'sk_neg_e'])
 
         init_params = self.__sk_initialize(init_params)
-        print init_params['sk_a'], init_params['sk_b'], init_params['sk_c']
         ctr = 0
         while (ctr < self.max_updates):
             point_t, result = self.__sk_stop(init_params)
@@ -154,9 +150,7 @@ class SVM(object):
             ctr += 1
 
         # Output training model to file
-        filename = "model_" + self.class_letter + "_" + \
-            str(self.pos_input.shape[0] + self.neg_input.shape[0]) + ".txt"
-        out_file = open(filename, 'wb')
+        out_file = open(sys.argv[4], 'wb')
 
         output = {}
         output['class_letter'] = self.class_letter
@@ -206,7 +200,7 @@ class SVM(object):
         """
 
         params['pos_alpha'] = np.zeros(self.pos_input.shape[0])
-        params['neg_alpha'] = np.zeros(self.neg_input.shape[1])
+        params['neg_alpha'] = np.zeros(self.neg_input.shape[0])
 
         params['pos_alpha'][0] = 1
         params['neg_alpha'][0] = 1

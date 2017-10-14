@@ -10,7 +10,13 @@ from PIL import Image
 
 
 class SVMTEST(object):
-    """Implements the SVM model tester"""
+    """Implements the SVM model tester
+
+    Attributes:
+        param_dict: Dictionary of parameters from trained model
+        test_input: Array of testing inputs
+        test_classes: List of actual classes for testing inputs
+    """
 
     def __init__(self, param_dict, test_input, test_classes):
         self.params = param_dict
@@ -48,17 +54,17 @@ class SVMTEST(object):
     def __svm_test(self, test_vector):
 
         score = 0.0
-        for i in range(self.params['pos_input'].shape[0]):
+        for i in range(self.params['pos_input'].shape[0] - 1):
             score += (self.params['pos_alpha'][i] *
                       self.__polynomial_kernal(test_vector,
                                                self.params['pos_input'][i]))
 
-        for i in range(self.params['neg_input'].shape[0]):
+        for i in range(self.params['neg_input'].shape[0] - 1):
             score += (self.params['neg_alpha'][i] * -1 *
                       self.__polynomial_kernal(test_vector,
                                                self.params['neg_input'][i]))
 
-        score += ((self.params['A'] - self.params['B']) / 2)
+        score += ((self.params['B'] - self.params['A']) / 2)
 
         return score
 
@@ -97,7 +103,7 @@ def get_test_input(train_folder, test_folder):
     test_classes = []
 
     for filename in os.listdir(test_folder):
-        abs_path = os.path.abspath(train_folder) + "/" + filename
+        abs_path = os.path.abspath(test_folder) + "/" + filename
 
         if generator_pattern.match(filename):
             classname = filename.split("_")[-1].split(".")[0]
