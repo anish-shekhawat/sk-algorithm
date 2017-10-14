@@ -156,7 +156,7 @@ class SVM(object):
         # Output training model to file
         filename = "model_" + self.class_letter + "_" + \
             str(self.pos_input.shape[0] + self.neg_input.shape[0]) + ".txt"
-        out_file = open(filename, 'w')
+        out_file = open(filename, 'wb')
 
         output = {}
         output['class_letter'] = self.class_letter
