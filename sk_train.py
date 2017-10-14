@@ -32,8 +32,8 @@ class SVM(object):
         :return: returns nothing
         """
 
-        self.epsilon = epsilon
-        self.max_updates = max_updates
+        self.epsilon = float(epsilon)
+        self.max_updates = int(max_updates)
         self.class_letter = class_letter
         self.lambda_max = 0.0
         # TODO: Convert to list
@@ -135,18 +135,37 @@ class SVM(object):
         self.neg_centroid = neg_sum / self.neg_input.shape[0]
 
     def train(self, output_file):
+        """Training function"""
         self.__scale_convex_hull()
 
-        init_params = dict.fromkeys(['sk_a', 'sk_b', 'sk_c', 'sk_pos_d',
-                                     'sk_neg_d', 'sk_pos_e', 'sk_neg_e'])
+        init_params = dict.fromkeys(['pos_alpha', 'neg_alpha', 'sk_a', 'sk_b',
+                                     'sk_c', 'sk_pos_d', 'sk_neg_d',
+                                     'sk_pos_e', 'sk_neg_e'])
 
-        self.__sk_initialize(init_params)
-
-        print self.__sk_stop(init_params)
-
+        init_params = self.__sk_initialize(init_params)
         print init_params['sk_a'], init_params['sk_b'], init_params['sk_c']
+        ctr = 0
+        while (ctr < self.max_updates):
+            point_t, result = self.__sk_stop(init_params)
+            if result is True:
+                break
+            init_params = self.__sk_update(init_params, point_t)
+            ctr += 1
 
-        self.__sk_update(init_params)
+        filename = "model_" + self.class_letter + "_" + \
+            str(self.pos_input.shape[0] + self.neg_input.shape[0]) + ".txt"
+        file = open(filename, 'w')
+
+        file.write(self.class_letter + "\n")
+        file.write(",".join(map(str, self.pos_centroid.tolist())) + "\n")
+        file.write(",".join(map(str, self.neg_centroid.tolist())) + "\n")
+        file.write(str(self.lambda_max) + "\n")
+        file.write("POS\n")
+        for i in range(self.pos_input.shape[0]):
+            file.write(str(i) + " " + str(init_params['pos_alpha'][i]) + "\n")
+        file.write("NEG\n")
+        for i in range(self.neg_input.shape[0]):
+            file.write(str(i) + " " + str(init_params['neg_alpha'][i]) + "\n")
 
     def __scale_convex_hull(self):
         """Scale convex hull of inputs
@@ -169,16 +188,11 @@ class SVM(object):
 
     def __scale_inputs(self):
         """Scale inputs"""
-        # print self.pos_input[0]
-        # print self.pos_centroid
         self.pos_input *= self.lambda_max
         self.pos_input += ((1 - self.lambda_max) * self.pos_centroid)
 
         self.neg_input *= self.lambda_max
         self.neg_input += ((1 - self.lambda_max) * self.neg_centroid)
-
-        # print self.pos_input[0]
-        # print self.neg_input[0]
 
     def __sk_initialize(self, params):
         """Initialize parameters for S-K algorithms
@@ -186,11 +200,11 @@ class SVM(object):
         :param params:
         """
 
-        pos_alpha = np.zeros(self.pos_input.shape[0])
-        neg_alpha = np.zeros(self.neg_input.shape[1])
+        params['pos_alpha'] = np.zeros(self.pos_input.shape[0])
+        params['neg_alpha'] = np.zeros(self.neg_input.shape[1])
 
-        pos_alpha[0] = 1
-        neg_alpha[0] = 1
+        params['pos_alpha'][0] = 1
+        params['neg_alpha'][0] = 1
 
         params['sk_a'] = self.__polynomial_kernal(
             self.pos_input[0], self.pos_input[0])
@@ -212,6 +226,8 @@ class SVM(object):
 
         params['sk_neg_e'] = [self.__polynomial_kernal(
             p, self.neg_input[0]) for p in self.neg_input]
+
+        return params
 
     def __polynomial_kernal(self, vector_a, vector_b):
         """Return result of degree four polynomial kernel function
@@ -243,7 +259,7 @@ class SVM(object):
 
         point_t = {}
 
-        if pos_min > neg_min:
+        if pos_min < neg_min:
             point_t['class'] = 'pos'
             point_t['index'] = pindex
             min_m = pos_min
@@ -255,8 +271,10 @@ class SVM(object):
         sum_sqrt = init_param['sk_a'] + \
             init_param['sk_b'] - 2 * init_param['sk_c']
         sum_sqrt **= 0.5
-
-        return (point_t, sum_sqrt - min_m < self.epsilon)
+        if (sum_sqrt - min_m) < self.epsilon:
+            return (point_t, True)
+        else:
+            return (point_t, False)
 
     @staticmethod
     def __calculate_m(params, index, input_class):
@@ -279,7 +297,90 @@ class SVM(object):
 
         return numerator / denominator
 
-    def __sk_update(self, init_params, ):
+    def __sk_update(self, init_params, point):
+        """S-K Update function
+
+        :param init_params:
+        :param point:
+        """
+        if point['class'] == 'pos':
+            numerator = init_params['sk_a'] - init_params['sk_pos_d'][point['index']]
+            numerator += init_params['sk_pos_e'][point['index']] - init_params['sk_c']
+
+            denominator = init_params['sk_a']
+            denominator += self.__polynomial_kernal(
+                self.pos_input[point['index']], self.pos_input[point['index']])
+            denominator -= 2 * (init_params['sk_pos_d'][point['index']] -
+                                init_params['sk_pos_e'][point['index']])
+
+            param_q = min(1, (numerator / denominator))
+
+            init_params['sk_a'] *= ((1 - param_q) ** 2)
+            init_params['sk_a'] += (2 * (1 - param_q) * param_q * init_params['sk_pos_d'][point['index']])
+            init_params['sk_a'] += (param_q ** 2) * self.__polynomial_kernal(
+                self.pos_input[point['index']], self.pos_input[point['index']])
+
+            init_params['sk_c'] *= (1 - param_q)
+            init_params['sk_c'] += param_q * init_params['sk_pos_e'][point['index']]
+
+            pos_d = []
+            for index, d in enumerate(init_params['sk_pos_d']):
+                d *= (1 - param_q)
+                d += param_q * self.__polynomial_kernal(
+                    self.pos_input[index], self.pos_input[point['index']])
+                pos_d.append(d)
+
+            init_params['sk_pos_d'] = pos_d
+
+            pos_alpha = []
+            for index, alpha in enumerate(init_params['pos_alpha']):
+                alpha *= (1 - param_q)
+                if index == point['index']:
+                    alpha += param_q
+                pos_alpha.append(alpha)
+
+            init_params['pos_alpha'] = pos_alpha
+
+        else:
+            numerator = init_params['sk_b'] - \
+                init_params['sk_neg_e'][point['index']]
+            numerator += init_params['sk_neg_d'][point['index']] - init_params['sk_c']
+
+            denominator = init_params['sk_b']
+            denominator += self.__polynomial_kernal(
+                self.neg_input[point['index']], self.neg_input[point['index']])
+            denominator -= 2 * (init_params['sk_neg_e'][point['index']] -
+                                init_params['sk_neg_d'][point['index']])
+
+            param_q = min(1, (numerator / denominator))
+
+            init_params['sk_b'] *= ((1 - param_q) ** 2)
+            init_params['sk_b'] += (2 * (1 - param_q) * param_q * init_params['sk_neg_e'][point['index']])
+            init_params['sk_b'] += (param_q ** 2) * self.__polynomial_kernal(
+                self.neg_input[point['index']], self.neg_input[point['index']])
+
+            init_params['sk_c'] *= (1 - param_q)
+            init_params['sk_c'] += (param_q * init_params['sk_neg_d'][point['index']])
+
+            neg_e = []
+            for index, e in enumerate(init_params['sk_neg_e']):
+                e *= (1 - param_q)
+                e += param_q * self.__polynomial_kernal(
+                    self.neg_input[index], self.neg_input[point['index']])
+                neg_e.append(e)
+
+            init_params['sk_neg_e'] = neg_e
+
+            neg_alpha = []
+            for index, alpha in enumerate(init_params['neg_alpha']):
+                alpha *= (1 - param_q)
+                if index == point['index']:
+                    alpha += param_q
+                neg_alpha.append(alpha)
+
+            init_params['neg_alpha'] = neg_alpha
+
+        return init_params
 
 
 if __name__ == '__main__':
