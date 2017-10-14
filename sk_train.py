@@ -4,6 +4,7 @@
 import sys
 import os
 import re
+import pickle
 import numpy as np
 from PIL import Image
 
@@ -152,20 +153,22 @@ class SVM(object):
             init_params = self.__sk_update(init_params, point_t)
             ctr += 1
 
+        # Output training model to file
         filename = "model_" + self.class_letter + "_" + \
             str(self.pos_input.shape[0] + self.neg_input.shape[0]) + ".txt"
-        file = open(filename, 'w')
+        out_file = open(filename, 'w')
 
-        file.write(self.class_letter + "\n")
-        file.write(",".join(map(str, self.pos_centroid.tolist())) + "\n")
-        file.write(",".join(map(str, self.neg_centroid.tolist())) + "\n")
-        file.write(str(self.lambda_max) + "\n")
-        file.write("POS\n")
-        for i in range(self.pos_input.shape[0]):
-            file.write(str(i) + " " + str(init_params['pos_alpha'][i]) + "\n")
-        file.write("NEG\n")
-        for i in range(self.neg_input.shape[0]):
-            file.write(str(i) + " " + str(init_params['neg_alpha'][i]) + "\n")
+        output = {}
+        output['class_letter'] = self.class_letter
+        output['pos_centroid'] = self.pos_centroid
+        output['neg_centroid'] = self.neg_centroid
+        output['pos_input'] = self.pos_input
+        output['neg_input'] = self.neg_input
+        output['lambda'] = self.lambda_max
+        output['pos_alpha'] = init_params['pos_alpha']
+        output['neg_alpha'] = init_params['neg_alpha']
+
+        pickle.dump(output, out_file)
 
     def __scale_convex_hull(self):
         """Scale convex hull of inputs
