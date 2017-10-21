@@ -28,7 +28,7 @@ class SVM(object):
         :param epsilon: Training error
         :param max_updates: No. of maximum updates
         :param class_letter: Image class for which SVM is trained
-        :return: returns nothing
+        :returns: returns nothing
         """
 
         self.epsilon = float(epsilon)
@@ -122,7 +122,7 @@ class SVM(object):
 
         :param pos_sum: Array sum of positive inputs
         :param neg_sum: Array sum of negative inputs
-        :return: returns nothing
+        :returns: returns nothing
         """
         self.pos_centroid = pos_sum / self.pos_input.shape[0]
         self.neg_centroid = neg_sum / self.neg_input.shape[0]
@@ -131,7 +131,7 @@ class SVM(object):
         """Trains the SVM on training data and stores model to file
 
         :param output_file: File to which model is written
-        :return: returns nothing
+        :returns: returns nothing
         """
         # Scale the convex hull
         self.__scale_convex_hull()
@@ -180,7 +180,7 @@ class SVM(object):
         Calculate maximum value of scaling factor (lambda) and
         scales the inputs using the lambda value
 
-        :return: returns nothing
+        :returns: returns nothing
         """
 
         # dist. between positive centroid and negative centroid
@@ -203,7 +203,7 @@ class SVM(object):
     def __scale_inputs(self):
         """Scale inputs for convex hull
 
-        :return: returns nothing
+        :returns: returns nothing
         """
 
         self.pos_input *= self.lambda_max
@@ -216,7 +216,7 @@ class SVM(object):
         """Initialize parameters for S-K algorithms
 
         :param params: Dictionary of S-K algorithm parameters
-        :return: returns dictionary initialized S-K algo parameters
+        :returns: returns dictionary initialized S-K algo parameters
         """
 
         params['pos_alpha'] = np.zeros(self.pos_input.shape[0])
@@ -248,7 +248,8 @@ class SVM(object):
 
         return params
 
-    def __polynomial_kernal(self, vector_a, vector_b):
+    @classmethod
+    def __polynomial_kernal(cls, vector_a, vector_b):
         """Return result of degree four polynomial kernel function
 
         :param vector_a: Input vector
@@ -266,7 +267,7 @@ class SVM(object):
         """Check if the S-K algorithm stopping condition is true
 
         :param init_param: Dictionary of S-K algorithm parameters
-        :return: Returns vector closest to separating hypersurfaces and
+        :returns: Returns vector closest to separating hypersurfaces and
                  true/false depending on whether model has converged or not
         """
 
@@ -300,8 +301,8 @@ class SVM(object):
         if (sum_sqrt - min_m) < self.epsilon:
             # Return true if model has converged
             return (point_t, True)
-        else:
-            return (point_t, False)
+
+        return (point_t, False)
 
     @staticmethod
     def __calculate_m(params, index, input_class):
@@ -331,7 +332,7 @@ class SVM(object):
 
         :param init_params: Dictionary of S-K algorithm parameters
         :param point: Point vector closest to the separating hypersurfaces
-        :return: Returns updated dictionary of S-K algorithm parameters
+        :returns: Returns updated dictionary of S-K algorithm parameters
         """
         # If the point vector is one of the positive samples
         if point['class'] == 'pos':
