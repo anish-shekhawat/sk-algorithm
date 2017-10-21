@@ -13,20 +13,19 @@ class SVM(object):
     """An SVM model
 
     Attirbutes:
-        epsilon:
+        epsilon: Training error
         max_updates: Max no. of updates
         class_letter: Class letter of training model
         pos_input: Positive training samples
         neg_input: Negative training samples
         pos_centroid: Centroid of positive training samples
-        neg_centroid
-
+        neg_centroid: Centroid of negative training samples
     """
 
     def __init__(self, epsilon, max_updates, class_letter):
         """ Return a new SVM object
 
-        :param epsilon:
+        :param epsilon: Training error
         :param max_updates: No. of maximum updates
         :param class_letter: Image class for which SVM is trained
         :return: returns nothing
@@ -45,7 +44,7 @@ class SVM(object):
         """Sets positive and negative training data arrays.
 
         :param train_folder: Folder name where training inputs are stored
-        "returns: returns nothing
+        :returns: returns nothing
         """
         # Check if folder exists
         if os.path.isdir(train_folder) is not True:
@@ -72,18 +71,11 @@ class SVM(object):
         pos_input_sum = np.zeros(625)
         neg_input_sum = np.zeros(625)
 
-        files = []
-        for filename in os.listdir(train_folder):
-            files.append(filename)
-
-        files.sort()
-
         # Convert images to numpy array of pixels
-        for filename in files:
+        for filename in os.listdir(train_folder):
             # Get absolute path
             abs_path = os.path.abspath(train_folder) + "/" + filename
-            # TODO: Remove duplicate code
-            # Check if filename matches training class pattern
+            # Check if filename matches training class filename pattern
             if pos_pattern.match(filename):
                 is_empty = False
                 # Open image using PIL
@@ -92,7 +84,7 @@ class SVM(object):
                 img_array = np.array(image)
                 # Reshape array to one dimension
                 img_array = img_array.reshape(-1)
-                # img_array /= 255
+                img_array /= 255
                 # Add to tpos_input_sum to calculate the centroid
                 pos_input_sum = np.add(pos_input_sum, img_array)
                 # Append to positive input collection array
@@ -105,18 +97,21 @@ class SVM(object):
                 image = Image.open(abs_path)
                 # Convert to numpy array
                 img_array = np.array(image)
+                print img_array.shape
                 # Reshape array to one dimension
                 img_array = img_array.reshape(-1)
-                # img_array /= 255
+                img_array /= 255
                 # Add to neg_input_sum to calculate the centroid
                 neg_input_sum = np.add(neg_input_sum, img_array)
                 # Append to positive input collection array
                 self.neg_input = np.vstack((self.neg_input, img_array))
 
+        # Check if folders are empty
         if is_empty is True:
             print >> sys.stderr, "NO DATA"
             exit(1)
 
+        # Remove the top row of initial zeros np arrays
         self.pos_input = np.delete(self.pos_input, 0, 0)
         self.neg_input = np.delete(self.neg_input, 0, 0)
 
@@ -133,25 +128,37 @@ class SVM(object):
         self.neg_centroid = neg_sum / self.neg_input.shape[0]
 
     def train(self, output_file):
-        """Training function"""
+        """Trains the SVM on training data and stores model to file
+
+        :param output_file: File to which model is written
+        :return: returns nothing
+        """
+        # Scale the convex hull
         self.__scale_convex_hull()
 
+        # Dictionary of parameters for S-K algorithm
         init_params = dict.fromkeys(['pos_alpha', 'neg_alpha', 'sk_a', 'sk_b',
                                      'sk_c', 'sk_pos_d', 'sk_neg_d',
                                      'sk_pos_e', 'sk_neg_e'])
 
+        # Initialize S-K parameters
         init_params = self.__sk_initialize(init_params)
+        # Counter for max updates
         ctr = 0
+
         while (ctr < self.max_updates):
+            # Check for stop condition
             point_t, result = self.__sk_stop(init_params)
+            # Stop if training error less than epsilon
             if result is True:
                 break
             init_params = self.__sk_update(init_params, point_t)
             ctr += 1
 
         # Output training model to file
-        out_file = open(sys.argv[4], 'wb')
+        out_file = open(output_file, 'wb')
 
+        # Dictionary with model parameters
         output = {}
         output['class_letter'] = self.class_letter
         output['pos_centroid'] = self.pos_centroid
@@ -164,6 +171,7 @@ class SVM(object):
         output['A'] = init_params['sk_a']
         output['B'] = init_params['sk_b']
 
+        # Output to file
         pickle.dump(output, out_file)
 
     def __scale_convex_hull(self):
@@ -171,22 +179,33 @@ class SVM(object):
 
         Calculate maximum value of scaling factor (lambda) and
         scales the inputs using the lambda value
+
+        :return: returns nothing
         """
 
-        radius = np.linalg.norm(self.pos_centroid - self.neg_centroid)
+        # dist. between positive centroid and negative centroid
+        dist = np.linalg.norm(self.pos_centroid - self.neg_centroid)
 
-        pos_radius = max([np.linalg.norm(p - self.pos_centroid)
-                          for p in self.pos_input])
+        # Find the farthest point in positive samples
+        pos_farthest_pt = max([np.linalg.norm(p - self.pos_centroid)
+                              for p in self.pos_input])
 
-        neg_radius = max([np.linalg.norm(p - self.neg_centroid)
-                          for p in self.neg_input])
+        # Find the farthest point in negative samples
+        neg_farthest_pt = max([np.linalg.norm(p - self.neg_centroid)
+                              for p in self.neg_input])
 
-        self.lambda_max = radius / (pos_radius + neg_radius)
+        # Calculate lambda
+        self.lambda_max = dist / (pos_farthest_pt + neg_farthest_pt)
 
+        # Scale inputs
         self.__scale_inputs()
 
     def __scale_inputs(self):
-        """Scale inputs"""
+        """Scale inputs for convex hull
+
+        :return: returns nothing
+        """
+
         self.pos_input *= self.lambda_max
         self.pos_input += ((1 - self.lambda_max) * self.pos_centroid)
 
@@ -196,7 +215,8 @@ class SVM(object):
     def __sk_initialize(self, params):
         """Initialize parameters for S-K algorithms
 
-        :param params:
+        :param params: Dictionary of S-K algorithm parameters
+        :return: returns dictionary initialized S-K algo parameters
         """
 
         params['pos_alpha'] = np.zeros(self.pos_input.shape[0])
@@ -231,9 +251,10 @@ class SVM(object):
     def __polynomial_kernal(self, vector_a, vector_b):
         """Return result of degree four polynomial kernel function
 
-        :param a:
-        :param b:
-        :returns:
+        :param vector_a: Input vector
+        :param vector_b: Input vector
+        :returns: Value of 4th-degree polynomial kernel
+                  function on input vectors
         """
 
         result = np.dot(vector_a, vector_b) + 1
@@ -242,9 +263,11 @@ class SVM(object):
         return result
 
     def __sk_stop(self, init_param):
-        """Check if the stopping condition is true
+        """Check if the S-K algorithm stopping condition is true
 
-        :param init_param:
+        :param init_param: Dictionary of S-K algorithm parameters
+        :return: Returns vector closest to separating hypersurfaces and
+                 true/false depending on whether model has converged or not
         """
 
         pos_m_array = [self.__calculate_m(init_param, i, 1)
@@ -253,8 +276,10 @@ class SVM(object):
         neg_m_array = [self.__calculate_m(init_param, i, -1)
                        for i, p in enumerate(self.neg_input)]
 
-        pos_min, pindex = min((val, idx) for idx, val in enumerate(pos_m_array))
-        neg_min, nindex = min((val, idx) for idx, val in enumerate(neg_m_array))
+        pos_min, pindex = min((val, idx) for idx,
+                              val in enumerate(pos_m_array))
+        neg_min, nindex = min((val, idx) for idx,
+                              val in enumerate(neg_m_array))
 
         point_t = {}
 
@@ -270,18 +295,23 @@ class SVM(object):
         sum_sqrt = init_param['sk_a'] + \
             init_param['sk_b'] - 2 * init_param['sk_c']
         sum_sqrt **= 0.5
+
+        # Check if model has converged
         if (sum_sqrt - min_m) < self.epsilon:
+            # Return true if model has converged
             return (point_t, True)
         else:
             return (point_t, False)
 
     @staticmethod
     def __calculate_m(params, index, input_class):
-        """Calculate m
+        """Calculate m in S-K algorithm
 
-        :param params:
-        :param point:
-        :input_class:
+        :param params: Dictionary of S-K algorithm
+        :param index: Index of the vector closest to separating hypersurfaces
+        :input_class: Pos/Neg class of the vector
+                      closest to separating hypersurfaces
+        :returns: m (distance) in S-K alglorithm
         """
 
         if input_class < 0:
@@ -299,12 +329,16 @@ class SVM(object):
     def __sk_update(self, init_params, point):
         """S-K Update function
 
-        :param init_params:
-        :param point:
+        :param init_params: Dictionary of S-K algorithm parameters
+        :param point: Point vector closest to the separating hypersurfaces
+        :return: Returns updated dictionary of S-K algorithm parameters
         """
+        # If the point vector is one of the positive samples
         if point['class'] == 'pos':
-            numerator = init_params['sk_a'] - init_params['sk_pos_d'][point['index']]
-            numerator += init_params['sk_pos_e'][point['index']] - init_params['sk_c']
+            numerator = init_params['sk_a']
+            numerator -= init_params['sk_pos_d'][point['index']]
+            numerator += init_params['sk_pos_e'][point['index']]
+            numerator -= init_params['sk_c']
 
             denominator = init_params['sk_a']
             denominator += self.__polynomial_kernal(
@@ -315,12 +349,14 @@ class SVM(object):
             param_q = min(1, (numerator / denominator))
 
             init_params['sk_a'] *= ((1 - param_q) ** 2)
-            init_params['sk_a'] += (2 * (1 - param_q) * param_q * init_params['sk_pos_d'][point['index']])
+            init_params['sk_a'] += (2 * (1 - param_q) * param_q *
+                                    init_params['sk_pos_d'][point['index']])
             init_params['sk_a'] += (param_q ** 2) * self.__polynomial_kernal(
                 self.pos_input[point['index']], self.pos_input[point['index']])
 
             init_params['sk_c'] *= (1 - param_q)
-            init_params['sk_c'] += param_q * init_params['sk_pos_e'][point['index']]
+            init_params['sk_c'] += param_q * \
+                init_params['sk_pos_e'][point['index']]
 
             pos_d = []
             for index, d in enumerate(init_params['sk_pos_d']):
@@ -340,10 +376,12 @@ class SVM(object):
 
             init_params['pos_alpha'] = pos_alpha
 
+        # If point vector is one of the negative samples
         else:
             numerator = init_params['sk_b'] - \
                 init_params['sk_neg_e'][point['index']]
-            numerator += init_params['sk_neg_d'][point['index']] - init_params['sk_c']
+            numerator += init_params['sk_neg_d'][point['index']] - \
+                init_params['sk_c']
 
             denominator = init_params['sk_b']
             denominator += self.__polynomial_kernal(
@@ -354,12 +392,14 @@ class SVM(object):
             param_q = min(1, (numerator / denominator))
 
             init_params['sk_b'] *= ((1 - param_q) ** 2)
-            init_params['sk_b'] += (2 * (1 - param_q) * param_q * init_params['sk_neg_e'][point['index']])
+            init_params['sk_b'] += (2 * (1 - param_q) * param_q *
+                                    init_params['sk_neg_e'][point['index']])
             init_params['sk_b'] += (param_q ** 2) * self.__polynomial_kernal(
                 self.neg_input[point['index']], self.neg_input[point['index']])
 
             init_params['sk_c'] *= (1 - param_q)
-            init_params['sk_c'] += (param_q * init_params['sk_neg_d'][point['index']])
+            init_params['sk_c'] += param_q * \
+                init_params['sk_neg_d'][point['index']]
 
             neg_e = []
             for index, e in enumerate(init_params['sk_neg_e']):
